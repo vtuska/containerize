@@ -1,0 +1,57 @@
+DISTRO=trusty
+DESTINATION=build/${DISTRO}
+
+USR=www-data
+GRP=www-data
+USRID=6666
+GRPID=6666
+
+HOMEDIR=/var/www
+
+PACKAGES=( apache2 php5 )
+
+INCLUDES=( /etc/host )
+
+EXCLUDES=("*.pyc" "/var/cache/apt" "/var/cache/debconf" "/var/lib/apt" "/var/lib/dpkg" "/usr/share/doc*" "/usr/share/man")
+EXCLUDES+=("/etc/alternatives" "/etc/apt" "/etc/cron*" "/etc/dbus-1" "/etc/dhcp" "/etc/dpkg" "/etc/fstab*" "/etc/init*" "/etc/initramfs-tools" "/etc/iproute2" "/etc/logrotate*" "/etc/modprobe.d" "/etc/ppp" "/etc/rc*" "/etc/sudo*" "/etc/systemd" "/etc/ufw")
+
+EXCLUDEPKGS=(adduser apt apt-rdepends apt-utils base-files base-passwd bash bsdutils busybox-initramfs bzip2 console-setup coreutils cpio cron dash debconf debconf-i18n debianutils dh-python diffutils dmsetup dpkg e2fslibs e2fsprogs eject file findutils gcc-4.8-base gnupg gpgv grep gzip hostname ifupdown initramfs-tools initramfs-tools-bin initscripts init-system-helpers insserv iproute2 iputils-ping isc-dhcp-client isc-dhcp-common kbd keyboard-configuration klibc-utils kmod language-pack-en language-pack-en-base less libacl1 libapt-inst1.5 libapt-pkg4.12 libapt-pkg-perl libarchive-extract-perl libattr1 libaudit1 libaudit-common libblkid1 libbsd0 libcap2 libcap2-bin libc-bin libcgmanager0 libdbus-1-3 libdebconfclient0 libdevmapper1.02.1 libdrm2 libestr0 libfribidi0 libgdbm3 libgnutls-openssl27 libjson0 libklibc libkmod2 liblocale-gettext-perl liblockfile1 liblockfile-bin liblog-message-simple-perl libmodule-pluggable-perl libmount1 libmpdec2 libncurses5 libncursesw5 libnewt0.52 libnih1 libnih-dbus1 libpam0g libpam-cap libpam-modules libpam-modules-bin libpam-runtime libplymouth2 libpng12-0 libpod-latex-perl libpopt0 libprocps3 libpython3.4-minimal libpython3.4-stdlib libpython3-stdlib libsasl2-modules libselinux1 libsemanage1 libsemanage-common libsepol1 libslang2 libss2 libstdc++6 libterm-ui-perl libtext-charwidth-perl libtext-iconv-perl libtext-soundex-perl libtext-wrapi18n-perl libudev1 libusb-0.1-4 libustr-1.0-1 locales lockfile-progs login logrotate lsb-release lsof makedev mawk module-init-tools mount mountall ncurses-base ncurses-bin netbase netcat-openbsd net-tools ntpdate openssl passwd perl perl-base perl-modules plymouth procps psmisc python3 python3.4 python3.4-minimal python3-minimal resolvconf rsyslog sed sensible-utils sgml-base ssl-cert sudo sysvinit-utils sysv-rc tar tzdata ubuntu-keyring ubuntu-minimal ucf udev upstart ureadahead util-linux vim-common vim-tiny whiptail xkb-data xml-core)
+
+XLINKDIR=( "/shared/ro" "/shared/rw" "/unshared/rw")
+XLINKIFY2DIR0=( "/etc/apache2" "/etc/default/apache2" "/etc/php5" "/etc/passwd" "/etc/group" )
+XLINKIFY2DIR1=( "/var/log/apache2" "$HOMEDIR" )
+XLINKIFY2DIR2=( "/tmp" "/var/run" "/run")
+
+IMAGENAME=apache2
+INSTANCENAME=.2
+PORT=( 2080:1080 )
+RUN="/usr/sbin/apache2 -DFOREGROUND"
+
+function init() {
+	echo "init"
+}
+
+function finalize() {
+	perl -i -pe "s/Listen\s+80/Listen 1080/" /etc/apache2/ports.conf
+	perl -i -pe "s/Listen\s+443/Listen 1443/" /etc/apache2/ports.conf
+	perl -i -pe "s/NameVirtualHost \*:80/NameVirtualHost \*:1080/" /etc/apache2/ports.conf
+	perl -i -pe "s/NameVirtualHost \*:443/NameVirtualHost \*:1443/" /etc/apache2/ports.conf
+	perl -i -pe "s/:80>/:1080>/" /etc/apache2/sites-available/*
+	perl -i -pe "s/:443>/:1443>/" /etc/apache2/sites-available/*
+
+	find /etc/apache2 -type f -print0 | xargs -0 perl -i -pe "s/\\\$\\{APACHE_RUN_USER\\}/www-data/"
+	find /etc/apache2 -type f -print0 | xargs -0 perl -i -pe "s/\\\$\\{APACHE_RUN_GROUP\\}/www-data/"
+	find /etc/apache2 -type f -print0 | xargs -0 perl -i -pe "s/\\\$\\{APACHE_PID_FILE\\}/\/var\/run\/apache2\.pid/"
+	find /etc/apache2 -type f -print0 | xargs -0 perl -i -pe "s/\\\$\\{APACHE_RUN_DIR\\}/\/var\/run\/apache2/"
+	find /etc/apache2 -type f -print0 | xargs -0 perl -i -pe "s/\\\$\\{APACHE_LOCK_DIR\\}/\/var\/lock\/apache2/"
+	find /etc/apache2 -type f -print0 | xargs -0 perl -i -pe "s/\\\$\\{APACHE_LOG_DIR\\}/\/var\/log\/apache2/"
+
+	for i in "${HOMEDIR}" /var/log/apache2 /run; do
+		chown -R $USR:$GRP $i
+		chmod 750 $i
+		F=$(readlink -f $i)
+		chown -R $USR:$GRP $F
+		chmod 750 $F
+	done
+}
+
